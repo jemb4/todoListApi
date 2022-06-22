@@ -8,7 +8,7 @@ from flask_swagger import swagger
 from flask_cors import CORS
 from utils import APIException, generate_sitemap
 from admin import setup_admin
-from models import db, User
+from models import db, User, Task
 #from models import Person
 
 app = Flask(__name__)
@@ -29,6 +29,53 @@ def handle_invalid_usage(error):
 @app.route('/')
 def sitemap():
     return generate_sitemap(app)
+
+@app.route('/task', methods=['POST', 'GET'])
+def handler_task():
+    if request.method == 'GET':
+        task = Task.query.all()
+        all_tasks = list(map(lambda task: task.serialize(), task))
+        return jsonify(all_tasks)
+
+    elif request.method == 'POST':
+        body = request.get_json()
+        print(body)
+        task = Task(text=body["text"], done=False)
+        db.session.add(task)
+        db.session.commit()
+        return jsonify(task.serialize(), 201)
+
+@app.route('/task/<int:task_id>', methods=['PUT', 'GET', 'DELETE'])
+def handle_task(task_id):
+    if request.method == 'PUT':
+        task = Task.query.get(task_id)
+        if task is None:
+           raise APIException("Tarea no encontrada", 404)
+
+        body = request.get_json()
+
+        if not ("done" in body):
+            raise APIException("Parametro no encontrado", 404)
+
+        task.done = body["done"]
+        db.session.commit()
+
+        return jsonify(task.serialize())
+    
+    elif request.method == 'GET':
+        task = Task.query.get(task_id)
+        if task is None:
+           raise APIException("Tarea no encontrada", 404)
+
+        return jsonify(task.serialize())
+
+    elif request.method == 'DELETE':
+        task = Task.query.get(task_id)
+        if task is None:
+            raise APIException("Tarea no encontrada", 404)
+        db.session.delete(task)
+        db.session.commit()
+        return jsonify(task.serialize())
 
 @app.route('/user', methods=['GET'])
 def handle_hello():
